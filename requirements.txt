@@ -1,0 +1,27 @@
+# Core audio
+sounddevice>=0.5
+webrtcvad-wheels>=2.0.10
+numpy>=1.26
+soundfile>=0.12  # útil para depurar, no obligatorio
+
+# ASR
+faster-whisper>=1.1
+
+# MT
+transformers>=4.43
+sentencepiece>=0.2
+accelerate>=0.30
+torch  # instalarse con el index de CUDA 12.1 (ver README)
+
+# TTS
+piper-tts>=1.2
+onnxruntime-gpu>=1.17
+
+# UI
+PySide6>=6.7
+qasync>=0.27
+pyqtgraph>=0.13
+
+# Utils
+rich>=13.7
+loguru>=0.7
