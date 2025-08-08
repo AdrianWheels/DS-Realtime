@@ -1,6 +1,5 @@
 import asyncio
 import collections
-import time
 import webrtcvad
 
 

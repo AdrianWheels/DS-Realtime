@@ -1,6 +1,5 @@
 import asyncio
 import sounddevice as sd
-import numpy as np
 from typing import AsyncGenerator, Optional
 
 
@@ -16,6 +15,11 @@ class MicCapture:
         self.blocksize = int(samplerate * frame_ms / 1000)
         self.bytes_per_frame = self.blocksize * 2  # int16
         self._queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=256)
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # Fallback for contexts without a running loop
+            self._loop = asyncio.get_event_loop()
 
         extra = None
         try:
@@ -53,8 +57,7 @@ class MicCapture:
             pass
         data = bytes(indata[: frames * 2])  # ya es int16 raw
         try:
-            loop = asyncio.get_event_loop()
-            loop.call_soon_threadsafe(self._queue.put_nowait, data)
+            self._loop.call_soon_threadsafe(self._queue.put_nowait, data)
         except RuntimeError:
             # Event loop cerrado
             pass
@@ -69,3 +72,9 @@ class MicCapture:
             self.stream.stop(); self.stream.close()
         except Exception:
             pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
