@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from rich.console import Console
@@ -18,10 +19,20 @@ console = Console()
 rich_install(show_locals=False)
 
 
+@dataclass
+class Utterance:
+    pcm: bytes
+    es_text: str = ""
+    en_text: str = ""
+    timer: StageTimer = field(default_factory=StageTimer)
+
+
 async def pipeline_cli(args):
     # Queues entre etapas
-    frames_q = asyncio.Queue(maxsize=256)        # bytes PCM16 16kHz 20ms
-    utterances_q = asyncio.Queue(maxsize=16)     # bytes PCM16 concatenados
+    frames_q = asyncio.Queue(maxsize=256)  # bytes PCM16 16kHz 20ms
+    asr_q = asyncio.Queue(maxsize=16)      # Utterance listos para ASR
+    mt_q = asyncio.Queue(maxsize=16)       # Utterance tras ASR
+    tts_q = asyncio.Queue(maxsize=16)      # Utterance tras MT
 
     # 1) Captura + VAD
     mic = MicCapture(device_name=args.input, samplerate=16000, frame_ms=20, exclusive=args.exclusive)
@@ -35,38 +46,49 @@ async def pipeline_cli(args):
     tts = PiperTTS(model_path=args.piper_model, use_cuda=True)
     sink = AudioSink(device_hint=args.output, samplerate=tts.sample_rate, channels=1, exclusive=args.exclusive)
 
-    timer = StageTimer()
-
     async def capture_task():
         async for frame in mic.frames():
             await frames_q.put(frame)
 
     async def vad_task():
         async for segment in vad.segments(frames_q):
-            await utterances_q.put(segment)
+            await asr_q.put(Utterance(pcm=segment))
 
-    async def nlp_task():
+    async def asr_worker():
         while True:
-            pcm = await utterances_q.get()
-            with timer.stage("total"):
-                with timer.stage("asr"):
-                    es_text = await asr.transcribe(pcm, language="es")
-                with timer.stage("mt"):
-                    en_text = await mt.translate(es_text, src_lang="spa_Latn", tgt_lang="eng_Latn")
-                console.log(f"[bold cyan]ES:[/bold cyan] {es_text}")
-                console.log(f"[bold green]EN:[/bold green] {en_text}")
-                with timer.stage("tts"):
-                    # stream directo al sink para mínima latencia
-                    for chunk in tts.synthesize_stream_raw(en_text):
-                        sink.write(chunk)
-            console.log(timer.summary())
-            utterances_q.task_done()
+            utt = await asr_q.get()
+            with utt.timer.stage("asr"):
+                utt.es_text = await asr.transcribe(utt.pcm, language="es")
+            console.log(f"[bold cyan]ES:[/bold cyan] {utt.es_text}")
+            await mt_q.put(utt)
+            asr_q.task_done()
+
+    async def mt_worker():
+        while True:
+            utt = await mt_q.get()
+            with utt.timer.stage("mt"):
+                utt.en_text = await mt.translate(utt.es_text, src_lang="spa_Latn", tgt_lang="eng_Latn")
+            console.log(f"[bold green]EN:[/bold green] {utt.en_text}")
+            await tts_q.put(utt)
+            mt_q.task_done()
+
+    async def tts_worker():
+        while True:
+            utt = await tts_q.get()
+            with utt.timer.stage("tts"):
+                for chunk in tts.synthesize_stream_raw(utt.en_text):
+                    sink.write(chunk)
+            utt.timer.stop()
+            console.log(utt.timer.summary())
+            tts_q.task_done()
 
     # Orquestación
     tasks = [
         asyncio.create_task(capture_task(), name="capture"),
         asyncio.create_task(vad_task(), name="vad"),
-        asyncio.create_task(nlp_task(), name="nlp"),
+        asyncio.create_task(asr_worker(), name="asr"),
+        asyncio.create_task(mt_worker(), name="mt"),
+        asyncio.create_task(tts_worker(), name="tts"),
     ]
 
     try:
