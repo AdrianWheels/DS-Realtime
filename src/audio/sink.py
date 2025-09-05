@@ -26,6 +26,7 @@ class AudioSink:
             extra_settings=extra,
         )
         self.stream.start()
+        self.underruns = 0
 
     def _find_device(self, hint: str):
         hint_low = hint.lower()
@@ -39,6 +40,12 @@ class AudioSink:
         if not audio_bytes:
             return
         self.stream.write(audio_bytes)
+        try:
+            status = self.stream.get_status()
+            if status.output_underflow:
+                self.underruns += 1
+        except Exception:
+            pass
 
     def close(self):
         try:

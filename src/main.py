@@ -1,7 +1,8 @@
 import argparse
 import asyncio
 import sys
-from dataclasses import dataclass, field
+import time
+
 from pathlib import Path
 
 from rich.console import Console
@@ -18,15 +19,10 @@ console = Console()
 rich_install(show_locals=False)
 
 
-@dataclass
-class Utterance:
-    pcm: bytes
-    es_text: str = ""
-    en_text: str = ""
-    timer: StageTimer = field(default_factory=StageTimer)
+
+async def pipeline_cli(args, ui_callback=None):
 
 
-async def pipeline_cli(args):
     # Queues entre etapas
     frames_q = asyncio.Queue(maxsize=256)  # bytes PCM16 16kHz 20ms
     asr_q = asyncio.Queue(maxsize=16)      # Utterance listos para ASR
@@ -76,19 +72,49 @@ async def pipeline_cli(args):
     async def tts_worker():
         while True:
             pcm = await utterances_q.get()
-            audio_sec = len(pcm) / (2 * 16000)
+
+            start = time.perf_counter()
+
             with timer.stage("total"):
                 with timer.stage("asr"):
                     es_text = await asr.transcribe(pcm, language="es")
+                t_first_partial = time.perf_counter() - start
+                if ui_callback:
+                    ui_callback(partial=es_text)
                 with timer.stage("mt"):
                     en_text = await mt.translate(es_text, src_lang="spa_Latn", tgt_lang="eng_Latn")
+                t_final = time.perf_counter() - start
+                if ui_callback:
+                    ui_callback(final=en_text)
                 console.log(f"[bold cyan]ES:[/bold cyan] {es_text}")
                 console.log(f"[bold green]EN:[/bold green] {en_text}")
+                t_tts_start = None
                 with timer.stage("tts"):
                     # stream directo al sink para mínima latencia
                     for chunk in tts.synthesize_stream_raw(en_text):
+                        if t_tts_start is None:
+                            t_tts_start = time.perf_counter() - start
                         sink.write(chunk)
-            console.log(timer.summary(audio_sec))
+
+            total_time = time.perf_counter() - start
+            duration = len(pcm) / (2 * 16000)
+            rtf = total_time / duration if duration else 0.0
+            metrics = {
+                "t_first_partial": t_first_partial,
+                "t_final": t_final,
+                "t_tts_start": t_tts_start if t_tts_start is not None else total_time,
+                "underruns": sink.underruns,
+                "rtf": rtf,
+            }
+            if ui_callback:
+                ui_callback(metrics=metrics)
+            console.log(
+                f"metrics: first_partial={t_first_partial*1000:.0f} ms | "
+                f"final={t_final*1000:.0f} ms | tts_start={t_tts_start*1000:.0f} ms | "
+                f"underruns={sink.underruns} | RTF={rtf:.2f}"
+            )
+            console.log(timer.summary())
+
             utterances_q.task_done()
 
 
