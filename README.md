@@ -1,5 +1,30 @@
 # LocalVoiceTranslate
 
+Traductor de voz local ES→EN, 100% offline con **configuración avanzada en tiempo real**.
+
+## 🎯 Características
+
+- ✅ **Traducción offline completa**: Sin servicios externos
+- ✅ **Interfaz gráfica avanzada**: Con configuración en tiempo real
+- ✅ **Anti-feedback inteligente**: Prevención de bucles de retroalimentación
+- ✅ **VAD avanzado**: Detección de voz con supresión de ruido espectral
+- ✅ **Optimizado para Discord**: Audio routing perfecto
+- ✅ **GPU accelerated**: NVIDIA CUDA para máximo rendimiento
+
+## Resumen
+
+LocalVoiceTranslate captura audio del micrófono, detecta segmentos de voz,
+transcribe al español, traduce al inglés y sintetiza el resultado en audio, todo
+sin depender de servicios externos. 
+
+### 🆕 Nuevas características v2.0:
+
+- **Ventana de configuración avanzada** con 5 pestañas organizadas
+- **Recarga de configuración en tiempo real** sin reiniciar
+- **Monitor de VAD en vivo** para debugging y optimización
+- **Sistema anti-bucles mejorado** con cooldowns y detección de similitud
+- **Auto-selección de dispositivos** para DiscordeTranslate
+
 Traductor de voz local ES→EN, 100 % offline.
 
 ## Resumen
@@ -38,34 +63,75 @@ aceleración GPU.
 
 ## Uso
 
-### Modo CLI
-
-```bash
-python -m src.main --nogui --input "Nombre del micrófono" --output "CABLE Input"
-```
-
-### Interfaz gráfica
+### 🎛️ Interfaz Gráfica (Recomendado)
 
 ```bash
 python -m src.main
 ```
 
-Al iniciar se puede seleccionar el dispositivo de entrada y la aplicación
-procesará la voz en tiempo real.
+**Nuevas características de la interfaz:**
+- Botón **"⚙️ Config"** para acceder a configuración avanzada
+- Auto-selección de dispositivos optimizada para Discord
+- Monitor en tiempo real del VAD y procesamiento de audio
+
+### 🔧 Ventana de Configuración Avanzada
+
+La nueva ventana de configuración permite ajustar todos los parámetros en tiempo real:
+
+- **🎤 Audio**: Sample rate, umbrales de voz, puerta de ruido
+- **🗣️ VAD**: Agresividad, padding, ratio de voz
+- **🔄 Anti-bucles**: Prevención de feedback, cooldowns, límites
+- **🔧 Filtros**: Pasa-alto/bajo, supresión espectral
+- **🐛 Debug**: Logging y monitor en tiempo real
+
+### Modo CLI
+
+```bash
+python -m src.main --nogui --input "Micrófono de los auriculares con micrófono (Logitech G535 Gaming Headset)" --output "CABLE Input"
+```
+
+### 🎮 Configuración para Discord
+
+1. **Dispositivos recomendados** (auto-seleccionados):
+   - Entrada: `Logitech G535 Gaming Headset`
+   - Salida: `CABLE Input (VB-Audio Virtual Cable)`
+
+2. **En Discord**:
+   - Entrada: Tu micrófono normal
+   - Salida: `CABLE Output (VB-Audio Virtual Cable)`
+
+3. **Configuración anti-bucles**:
+   - Umbral de voz: -30dB
+   - Cooldown: 500ms
+   - Máx. traducciones consecutivas: 3
 
 ## Arquitectura
 
 La pipeline se ejecuta de forma asíncrona en varias etapas:
 
 1. **audio.capture.MicCapture** – captura frames PCM16 del micrófono.
-2. **audio.vad.VADSegmenter** – segmenta voz usando WebRTC VAD.
-3. **pipeline.FasterWhisperASR** – transcribe texto en español.
-4. **pipeline.NLLBTranslator** – traduce el texto al inglés.
-5. **pipeline.PiperTTS** – sintetiza audio en inglés.
+2. **audio.advanced_vad.AdvancedVADSegmenter** – segmenta voz con anti-feedback y supresión de ruido.
+3. **pipeline.asr.FasterWhisperASR** – transcribe texto en español.
+4. **pipeline.translate.NLLBTranslator** – traduce el texto al inglés.
+5. **pipeline.tts.PiperTTS** – sintetiza audio en inglés.
 6. **audio.sink.AudioSink** – envía el audio generado al dispositivo de salida.
 
-`utils.StageTimer` registra tiempos por etapa y `ui.main_window` ofrece una
-interfaz mínima con PySide6.
+### 🧠 Sistema VAD Avanzado
+
+- **WebRTC VAD base** con configuración dinámica
+- **Supresión espectral de ruido** en tiempo real
+- **Detección de bucles de feedback** con similitud de texto
+- **Cooldowns inteligentes** para prevenir spam
+- **Umbrales de nivel** configurables para diferentes entornos
+
+### 🎛️ Configuración en Tiempo Real
+
+- **Sin reinicio**: Los cambios se aplican inmediatamente
+- **Persistencia**: Se guarda automáticamente en `config.ini`
+- **Monitor visual**: Feedback en vivo del estado del sistema
+
+`utils.StageTimer` registra tiempos por etapa y `ui.config_window` ofrece
+configuración avanzada con PySide6.
 
 ## Desarrollo y pruebas
 
@@ -77,3 +143,28 @@ pytest
 
 Se recomienda ejecutarlas antes de enviar cambios para verificar el correcto
 funcionamiento del pipeline.
+
+## 📋 Archivos de configuración
+
+- **`config.ini`**: Configuración principal del VAD y procesamiento
+- **`CONFIGURACION_AVANZADA.md`**: Guía detallada de la interfaz de configuración
+
+## 🔧 Solución de problemas
+
+### Bucles de retroalimentación
+Si experimentas bucles de audio:
+1. Abre la ventana de configuración (⚙️ Config)
+2. Ve a la pestaña "🔄 Anti-bucles"
+3. Ajusta el cooldown a 1000ms
+4. Reduce el máximo de traducciones consecutivas a 2
+
+### Sensibilidad del VAD
+Para ajustar la detección de voz:
+1. Pestaña "🗣️ VAD" → Ajusta agresividad (0-3)
+2. Pestaña "🎤 Audio" → Modifica umbral de voz (-40 a 0 dB)
+3. Usa la pestaña "🐛 Debug" para monitorear en tiempo real
+
+## 📚 Documentación adicional
+
+- [Configuración Avanzada](CONFIGURACION_AVANZADA.md) - Guía completa de la interfaz
+- [Scripts Discord](discord_mode.ps1) - Automatización para gaming

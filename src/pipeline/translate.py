@@ -6,7 +6,9 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 class NLLBTranslator:
     def __init__(self, model_name: str, device: str = "cuda"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, torch_dtype=torch.float16).to(device)
+        # Use the new `dtype` argument instead of the deprecated `torch_dtype`.
+        # Keep torch.float16 as the preferred dtype for memory savings on GPU.
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, dtype=torch.float16).to(device)
         self.device = device
 
     async def translate(self, text: str, src_lang: str = "spa_Latn", tgt_lang: str = "eng_Latn", max_new_tokens: int = 256) -> str:
