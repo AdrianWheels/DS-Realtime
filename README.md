@@ -1,170 +1,208 @@
-# LocalVoiceTranslate
+# 🎤 DSRealtime - Traductor de Voz en Tiempo Real
 
-Traductor de voz local ES→EN, 100% offline con **configuración avanzada en tiempo real**.
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## 🎯 Características
+**DSRealtime** es un traductor de voz en tiempo real que convierte audio en español a inglés usando IA local. Perfecto para gaming, streaming y comunicación internacional.
 
-- ✅ **Traducción offline completa**: Sin servicios externos
-- ✅ **Interfaz gráfica avanzada**: Con configuración en tiempo real
-- ✅ **Anti-feedback inteligente**: Prevención de bucles de retroalimentación
-- ✅ **VAD avanzado**: Detección de voz con supresión de ruido espectral
-- ✅ **Optimizado para Discord**: Audio routing perfecto
-- ✅ **GPU accelerated**: NVIDIA CUDA para máximo rendimiento
+## ✨ Características Principales
 
-## Resumen
+- 🎯 **Traducción en Tiempo Real**: Español → Inglés con latencia mínima
+- 🤖 **IA 100% Local**: Sin conexión a internet requerida
+- 🎮 **Optimizado para Gaming**: Compatible con Discord, OBS, etc.
+- 🔧 **Configuración Avanzada**: Control total sobre todos los parámetros
+- 🛡️ **Prevención de Bucles**: Sistema inteligente anti-eco
+- 💻 **Interfaz Gráfica**: UI moderna con PySide6
+- ⚡ **Multi-perfil**: Soporte CPU y GPU automático
 
-LocalVoiceTranslate captura audio del micrófono, detecta segmentos de voz,
-transcribe al español, traduce al inglés y sintetiza el resultado en audio, todo
-sin depender de servicios externos. 
+## 🚀 Instalación Rápida
 
-### 🆕 Nuevas características v2.0:
+### 1. Clonar el Repositorio
+```bash
+git clone https://github.com/AdrianWheels/DSRealtime.git
+cd DSRealtime
+```
 
-- **Ventana de configuración avanzada** con 5 pestañas organizadas
-- **Recarga de configuración en tiempo real** sin reiniciar
-- **Monitor de VAD en vivo** para debugging y optimización
-- **Sistema anti-bucles mejorado** con cooldowns y detección de similitud
-- **Auto-selección de dispositivos** para DiscordeTranslate
+### 2. Instalar Dependencias
+```bash
+pip install -r requirements.txt
+```
 
-Traductor de voz local ES→EN, 100 % offline.
+### 3. Validar Sistema
+```bash
+python validate_system.py
+```
 
-## Resumen
+### 4. ¡Ejecutar!
 
-LocalVoiceTranslate captura audio del micrófono, detecta segmentos de voz,
-transcribe al español, traduce al inglés y sintetiza el resultado en audio, todo
-sin depender de servicios externos. La aplicación funciona en modo CLI o con
-una interfaz gráfica básica y está diseñada para ejecutarse de forma local con
-aceleración GPU.
-
-## Requisitos
-
-- Windows 11 x64
-- Python 3.11
-- NVIDIA RTX 4080 con CUDA 12.1 (drivers recientes)
-- VB-Audio Virtual Cable instalado
-
-## Instalación
-
-1. **Crear venv** y actualizar pip:
-
-   ```powershell
-   py -3.11 -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   python -m pip install -U pip wheel pip-tools
-   ```
-
-2. **Instalar dependencias:**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-   Para `torch` y `onnxruntime` se recomienda utilizar los binarios con soporte
-   CUDA 12.1.
-
-## Uso
-
-### 🎛️ Interfaz Gráfica (Recomendado)
-
+**Opción 1: Interfaz Gráfica (Recomendado)**
 ```bash
 python -m src.main
 ```
 
-**Nuevas características de la interfaz:**
-- Botón **"⚙️ Config"** para acceder a configuración avanzada
+**Opción 2: Script de Control Centralizado**
+```bash
+.\dsrealtime.ps1
+```
+
+**Opción 3: Línea de Comandos Directa**
+```bash
+python -m src.main --nogui --profile cpu-medium --input 8 --output 6
+```
+
+## � Uso Rápido
+
+### Script Centralizado (Recomendado)
+```bash
+.\dsrealtime.ps1
+```
+Menú interactivo con todas las opciones:
+- Configuraciones predefinidas para Discord
+- Modo anti-bucles avanzado
+- Validación del sistema
+- Gestión de dispositivos
+
+### Interfaz Gráfica
+```bash
+python -m src.main
+```
+- **Botón "⚙️ Config"** para configuración avanzada en tiempo real
 - Auto-selección de dispositivos optimizada para Discord
-- Monitor en tiempo real del VAD y procesamiento de audio
+- Monitor VAD en vivo para debugging
 
-### 🔧 Ventana de Configuración Avanzada
+```ini
+[audio]
+voice_threshold_db = -30    # Sensibilidad del micrófono
+noise_gate_db = -45        # Filtro de ruido de fondo
 
-La nueva ventana de configuración permite ajustar todos los parámetros en tiempo real:
+[vad]
+aggressiveness = 3         # Detección de voz: 0=permisivo, 3=estricto
 
-- **🎤 Audio**: Sample rate, umbrales de voz, puerta de ruido
-- **🗣️ VAD**: Agresividad, padding, ratio de voz
-- **🔄 Anti-bucles**: Prevención de feedback, cooldowns, límites
-- **🔧 Filtros**: Pasa-alto/bajo, supresión espectral
-- **🐛 Debug**: Logging y monitor en tiempo real
-
-### Modo CLI
-
-```bash
-python -m src.main --nogui --input "Micrófono de los auriculares con micrófono (Logitech G535 Gaming Headset)" --output "CABLE Input"
+[feedback_prevention]
+enable_feedback_detection = true    # Prevenir bucles de audio
+cooldown_after_translation_ms = 500 # Pausa entre traducciones
 ```
 
-### 🎮 Configuración para Discord
+### Configuración Avanzada
 
-1. **Dispositivos recomendados** (auto-seleccionados):
-   - Entrada: `Logitech G535 Gaming Headset`
-   - Salida: `CABLE Input (VB-Audio Virtual Cable)`
+Para opciones avanzadas, consulta [GUIA_CONFIGURACION.md](GUIA_CONFIGURACION.md)
 
-2. **En Discord**:
-   - Entrada: Tu micrófono normal
-   - Salida: `CABLE Output (VB-Audio Virtual Cable)`
+## 🎮 Uso con Discord
 
-3. **Configuración anti-bucles**:
-   - Umbral de voz: -30dB
-   - Cooldown: 500ms
-   - Máx. traducciones consecutivas: 3
+### Opción 1: VB-Cable (Recomendado)
+1. Instala [VB-Audio Cable](https://vb-audio.com/Cable/)
+2. Configura DSRealtime para enviar a "CABLE Input"
+3. En Discord, selecciona "CABLE Output" como micrófono
 
-## Arquitectura
-
-La pipeline se ejecuta de forma asíncrona en varias etapas:
-
-1. **audio.capture.MicCapture** – captura frames PCM16 del micrófono.
-2. **audio.advanced_vad.AdvancedVADSegmenter** – segmenta voz con anti-feedback y supresión de ruido.
-3. **pipeline.asr.FasterWhisperASR** – transcribe texto en español.
-4. **pipeline.translate.NLLBTranslator** – traduce el texto al inglés.
-5. **pipeline.tts.PiperTTS** – sintetiza audio en inglés.
-6. **audio.sink.AudioSink** – envía el audio generado al dispositivo de salida.
-
-### 🧠 Sistema VAD Avanzado
-
-- **WebRTC VAD base** con configuración dinámica
-- **Supresión espectral de ruido** en tiempo real
-- **Detección de bucles de feedback** con similitud de texto
-- **Cooldowns inteligentes** para prevenir spam
-- **Umbrales de nivel** configurables para diferentes entornos
-
-### 🎛️ Configuración en Tiempo Real
-
-- **Sin reinicio**: Los cambios se aplican inmediatamente
-- **Persistencia**: Se guarda automáticamente en `config.ini`
-- **Monitor visual**: Feedback en vivo del estado del sistema
-
-`utils.StageTimer` registra tiempos por etapa y `ui.config_window` ofrece
-configuración avanzada con PySide6.
-
-## Desarrollo y pruebas
-
-Las pruebas unitarias se ejecutan con:
-
+### Opción 2: Modo Discord Directo
 ```bash
-pytest
+./discord_mode.ps1
 ```
 
-Se recomienda ejecutarlas antes de enviar cambios para verificar el correcto
-funcionamiento del pipeline.
+## 📊 Perfiles de Rendimiento
 
-## 📋 Archivos de configuración
+| Perfil | Hardware | Latencia | Calidad |
+|--------|----------|----------|---------|
+| `cpu-light` | CPU básica | ~800ms | Buena |
+| `cpu-medium` | CPU potente | ~500ms | Muy buena |
+| `gpu-medium` | GPU 6+ GB | ~300ms | Excelente |
+| `gpu-high` | GPU 16+ GB | ~200ms | Premium |
 
-- **`config.ini`**: Configuración principal del VAD y procesamiento
-- **`CONFIGURACION_AVANZADA.md`**: Guía detallada de la interfaz de configuración
+## 🔧 Solución de Problemas
 
-## 🔧 Solución de problemas
+### Errores Comunes
 
-### Bucles de retroalimentación
-Si experimentas bucles de audio:
-1. Abre la ventana de configuración (⚙️ Config)
-2. Ve a la pestaña "🔄 Anti-bucles"
-3. Ajusta el cooldown a 1000ms
-4. Reduce el máximo de traducciones consecutivas a 2
+1. **"FileNotFoundError: models/piper/..."**
+   ```bash
+   # Descargar modelos faltantes
+   python download_models.py
+   ```
 
-### Sensibilidad del VAD
-Para ajustar la detección de voz:
-1. Pestaña "🗣️ VAD" → Ajusta agresividad (0-3)
-2. Pestaña "🎤 Audio" → Modifica umbral de voz (-40 a 0 dB)
-3. Usa la pestaña "🐛 Debug" para monitorear en tiempo real
+2. **"No detecta mi voz"**
+   - Reducir `voice_threshold_db` en config.ini
+   - Verificar micrófono con `python list_devices.py`
 
-## 📚 Documentación adicional
+3. **"Bucles de audio en Discord"**
+   - Activar `feedback_prevention` en config.ini
+   - Usar `discord_anti_bucles.ps1`
 
-- [Configuración Avanzada](CONFIGURACION_AVANZADA.md) - Guía completa de la interfaz
-- [Scripts Discord](discord_mode.ps1) - Automatización para gaming
+### Validación del Sistema
+
+Ejecuta el validador para diagnosticar problemas:
+
+```bash
+python validate_system.py
+```
+
+## 📁 Estructura del Proyecto
+
+```
+DSRealtime/
+├── src/
+│   ├── main.py              # Punto de entrada principal
+│   ├── profiles.py          # Gestión de perfiles de hardware
+│   ├── audio/               # Procesamiento de audio
+│   │   ├── capture.py       # Captura de micrófono
+│   │   ├── advanced_vad.py  # Detección de voz avanzada
+│   │   └── sink.py          # Salida de audio
+│   ├── pipeline/            # Pipeline de IA
+│   │   ├── asr.py           # Reconocimiento de voz
+│   │   ├── translate.py     # Traducción
+│   │   └── tts.py           # Síntesis de voz
+│   ├── ui/                  # Interfaz gráfica
+│   └── utils/               # Utilidades
+├── models/                  # Modelos de IA locales
+├── tests/                   # Tests automatizados
+├── config.ini              # Configuración principal
+├── validate_system.py      # Validador del sistema
+└── requirements.txt        # Dependencias Python
+```
+
+## 🧪 Testing
+
+Ejecutar todos los tests:
+
+```bash
+python -m pytest tests/ -v
+```
+
+Tests específicos:
+
+```bash
+python -m pytest tests/test_improvements.py -v
+```
+
+## 📚 Documentación
+
+- [📖 Guía de Configuración Avanzada](GUIA_CONFIGURACION.md)
+- [🔧 Configuración Avanzada Original](CONFIGURACION_AVANZADA.md)
+- [📝 Changelog](CHANGELOG.md)
+
+## 🤝 Contribuir
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## 📜 Licencia
+
+Este proyecto está bajo la Licencia MIT. Ver [LICENSE](LICENSE) para más detalles.
+
+## 🙏 Agradecimientos
+
+- [Piper TTS](https://github.com/rhasspy/piper) por la síntesis de voz
+- [Faster Whisper](https://github.com/guillaumekln/faster-whisper) por el reconocimiento
+- [NLLB](https://github.com/facebookresearch/fairseq/tree/nllb) por la traducción
+- La comunidad de Python por las increíbles librerías
+
+## 📬 Soporte
+
+- 🐛 **Issues**: [GitHub Issues](https://github.com/AdrianWheels/DSRealtime/issues)
+- 💬 **Discusiones**: [GitHub Discussions](https://github.com/AdrianWheels/DSRealtime/discussions)
+- 📧 **Email**: [tu-email@ejemplo.com](mailto:tu-email@ejemplo.com)
+
+---
+
+⭐ **¡Si te gusta el proyecto, dale una estrella en GitHub!** ⭐

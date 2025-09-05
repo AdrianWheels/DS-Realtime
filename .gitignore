@@ -1,2 +1,69 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Logs y archivos temporales
+*.log
+ui_debug.log
+dsrealtime.log
+temp/
+tmp/
+
+# Configuración local específica del usuario
+config_local.ini
+config_user.ini
+
+# Audio clips de debug
+audio_clips/
+debug_audio/
+
+# Modelos grandes (deben descargarse)
+models/vosk-model-*/
+models/*/
+!models/README.md
+!models/piper/README.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Backup files
+*.bak
+*.backup
+*.old
