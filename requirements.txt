@@ -6,6 +6,7 @@ soundfile>=0.12  # útil para depurar, no obligatorio
 
 # ASR
 faster-whisper>=1.1
+vosk>=0.3.45
 
 # MT
 transformers>=4.43
@@ -16,6 +17,7 @@ torch  # instalarse con el index de CUDA 12.1 (ver README)
 # TTS
 piper-tts>=1.2
 onnxruntime-gpu>=1.17
+TTS>=0.14
 
 # UI
 PySide6>=6.7

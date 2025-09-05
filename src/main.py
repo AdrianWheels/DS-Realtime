@@ -10,9 +10,8 @@ from rich.traceback import install as rich_install
 from audio.capture import MicCapture
 from audio.vad import VADSegmenter
 from audio.sink import AudioSink
-from pipeline.asr import FasterWhisperASR
 from pipeline.translate import NLLBTranslator
-from pipeline.tts import PiperTTS
+from profiles import select_profile, build_profile
 from utils.timing import StageTimer
 
 console = Console()
@@ -39,11 +38,13 @@ async def pipeline_cli(args):
     vad = VADSegmenter(sample_rate=16000, frame_ms=20, padding_ms=400, aggressiveness=2)
 
     # 2) ASR + MT + TTS + Sink
-    asr = FasterWhisperASR(model_size=args.whisper, device="cuda", compute_type="float16")
-    mt = NLLBTranslator(model_name="facebook/nllb-200-distilled-600M", device="cuda")
-
-    # Cargamos TTS y salida VB-Cable (samplerate de la voz)
-    tts = PiperTTS(model_path=args.piper_model, use_cuda=True)
+    profile = select_profile() if args.profile == "auto" else build_profile(args.profile)
+    asr = profile.asr
+    tts = profile.tts
+    mt = NLLBTranslator(
+        model_name="facebook/nllb-200-distilled-600M",
+        device="cuda" if torch.cuda.is_available() else "cpu",
+    )
     sink = AudioSink(device_hint=args.output, samplerate=tts.sample_rate, channels=1, exclusive=args.exclusive)
 
     async def capture_task():
@@ -74,13 +75,22 @@ async def pipeline_cli(args):
 
     async def tts_worker():
         while True:
-            utt = await tts_q.get()
-            with utt.timer.stage("tts"):
-                for chunk in tts.synthesize_stream_raw(utt.en_text):
-                    sink.write(chunk)
-            utt.timer.stop()
-            console.log(utt.timer.summary())
-            tts_q.task_done()
+            pcm = await utterances_q.get()
+            audio_sec = len(pcm) / (2 * 16000)
+            with timer.stage("total"):
+                with timer.stage("asr"):
+                    es_text = await asr.transcribe(pcm, language="es")
+                with timer.stage("mt"):
+                    en_text = await mt.translate(es_text, src_lang="spa_Latn", tgt_lang="eng_Latn")
+                console.log(f"[bold cyan]ES:[/bold cyan] {es_text}")
+                console.log(f"[bold green]EN:[/bold green] {en_text}")
+                with timer.stage("tts"):
+                    # stream directo al sink para mínima latencia
+                    for chunk in tts.synthesize_stream_raw(en_text):
+                        sink.write(chunk)
+            console.log(timer.summary(audio_sec))
+            utterances_q.task_done()
+
 
     # Orquestación
     tasks = [
@@ -106,9 +116,9 @@ def build_arg_parser():
     p.add_argument("--input", default=None, help="Nombre/parcial del micrófono de entrada (WASAPI)")
     p.add_argument("--output", default="CABLE Input", help="Nombre/parcial del dispositivo de salida (VB-Cable)")
     p.add_argument("--exclusive", action="store_true", help="WASAPI exclusive mode (menor latencia)")
-    p.add_argument("--whisper", default="small", help="Tamaño modelo faster-whisper (small/medium/large-v3, etc.)")
-    p.add_argument("--piper-model", default=str(Path(__file__).resolve().parents[1] / "models/piper/en_US-lessac-medium.onnx"),
-                   help="Ruta al modelo Piper .onnx")
+    p.add_argument("--profile", default="auto",
+                   choices=["auto", "cpu-light", "gpu-medium", "gpu-high"],
+                   help="Perfil de hardware/modelos")
     return p
 
 
