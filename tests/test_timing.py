@@ -12,3 +12,12 @@ def test_stage_timer_accumulates_and_clears():
     assert 'phase=' in summary and 'RTF=' in summary
     assert timer._stamps == {}
     assert timer.summary() == ''
+
+
+def test_stage_timer_stop_adds_total():
+    timer = StageTimer()
+    with timer.stage('stage'):
+        time.sleep(0.001)
+    timer.stop()
+    summary = timer.summary()
+    assert 'total=' in summary

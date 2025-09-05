@@ -5,7 +5,8 @@ from contextlib import contextmanager
 class StageTimer:
     def __init__(self):
         self._stamps = {}
-        self._last = None
+        # Inicio global para calcular el tiempo total del pipeline
+        self._start = time.perf_counter()
 
     @contextmanager
     def stage(self, name: str):
@@ -24,3 +25,7 @@ class StageTimer:
             parts.append(f"RTF={rtf:.2f}")
         self._stamps.clear()
         return " | ".join(parts)
+
+    def stop(self):
+        """Registra el tiempo total desde la creación del temporizador."""
+        self._stamps["total"] = time.perf_counter() - self._start
