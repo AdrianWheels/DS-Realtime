@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import sys
 import time
+
 from pathlib import Path
 
 from rich.console import Console
@@ -10,33 +11,37 @@ from rich.traceback import install as rich_install
 from audio.capture import MicCapture
 from audio.vad import VADSegmenter
 from audio.sink import AudioSink
-from pipeline.asr import FasterWhisperASR
 from pipeline.translate import NLLBTranslator
-from pipeline.tts import PiperTTS
+from profiles import select_profile, build_profile
 from utils.timing import StageTimer
 
 console = Console()
 rich_install(show_locals=False)
 
 
+
 async def pipeline_cli(args, ui_callback=None):
+
+
     # Queues entre etapas
-    frames_q = asyncio.Queue(maxsize=256)        # bytes PCM16 16kHz 20ms
-    utterances_q = asyncio.Queue(maxsize=16)     # bytes PCM16 concatenados
+    frames_q = asyncio.Queue(maxsize=256)  # bytes PCM16 16kHz 20ms
+    asr_q = asyncio.Queue(maxsize=16)      # Utterance listos para ASR
+    mt_q = asyncio.Queue(maxsize=16)       # Utterance tras ASR
+    tts_q = asyncio.Queue(maxsize=16)      # Utterance tras MT
 
     # 1) Captura + VAD
     mic = MicCapture(device_name=args.input, samplerate=16000, frame_ms=20, exclusive=args.exclusive)
     vad = VADSegmenter(sample_rate=16000, frame_ms=20, padding_ms=400, aggressiveness=2)
 
     # 2) ASR + MT + TTS + Sink
-    asr = FasterWhisperASR(model_size=args.whisper, device="cuda", compute_type="float16")
-    mt = NLLBTranslator(model_name="facebook/nllb-200-distilled-600M", device="cuda")
-
-    # Cargamos TTS y salida VB-Cable (samplerate de la voz)
-    tts = PiperTTS(model_path=args.piper_model, use_cuda=True)
+    profile = select_profile() if args.profile == "auto" else build_profile(args.profile)
+    asr = profile.asr
+    tts = profile.tts
+    mt = NLLBTranslator(
+        model_name="facebook/nllb-200-distilled-600M",
+        device="cuda" if torch.cuda.is_available() else "cpu",
+    )
     sink = AudioSink(device_hint=args.output, samplerate=tts.sample_rate, channels=1, exclusive=args.exclusive)
-
-    timer = StageTimer()
 
     async def capture_task():
         async for frame in mic.frames():
@@ -44,12 +49,32 @@ async def pipeline_cli(args, ui_callback=None):
 
     async def vad_task():
         async for segment in vad.segments(frames_q):
-            await utterances_q.put(segment)
+            await asr_q.put(Utterance(pcm=segment))
 
-    async def nlp_task():
+    async def asr_worker():
+        while True:
+            utt = await asr_q.get()
+            with utt.timer.stage("asr"):
+                utt.es_text = await asr.transcribe(utt.pcm, language="es")
+            console.log(f"[bold cyan]ES:[/bold cyan] {utt.es_text}")
+            await mt_q.put(utt)
+            asr_q.task_done()
+
+    async def mt_worker():
+        while True:
+            utt = await mt_q.get()
+            with utt.timer.stage("mt"):
+                utt.en_text = await mt.translate(utt.es_text, src_lang="spa_Latn", tgt_lang="eng_Latn")
+            console.log(f"[bold green]EN:[/bold green] {utt.en_text}")
+            await tts_q.put(utt)
+            mt_q.task_done()
+
+    async def tts_worker():
         while True:
             pcm = await utterances_q.get()
+
             start = time.perf_counter()
+
             with timer.stage("total"):
                 with timer.stage("asr"):
                     es_text = await asr.transcribe(pcm, language="es")
@@ -70,6 +95,7 @@ async def pipeline_cli(args, ui_callback=None):
                         if t_tts_start is None:
                             t_tts_start = time.perf_counter() - start
                         sink.write(chunk)
+
             total_time = time.perf_counter() - start
             duration = len(pcm) / (2 * 16000)
             rtf = total_time / duration if duration else 0.0
@@ -88,13 +114,17 @@ async def pipeline_cli(args, ui_callback=None):
                 f"underruns={sink.underruns} | RTF={rtf:.2f}"
             )
             console.log(timer.summary())
+
             utterances_q.task_done()
+
 
     # Orquestación
     tasks = [
         asyncio.create_task(capture_task(), name="capture"),
         asyncio.create_task(vad_task(), name="vad"),
-        asyncio.create_task(nlp_task(), name="nlp"),
+        asyncio.create_task(asr_worker(), name="asr"),
+        asyncio.create_task(mt_worker(), name="mt"),
+        asyncio.create_task(tts_worker(), name="tts"),
     ]
 
     try:
@@ -112,9 +142,9 @@ def build_arg_parser():
     p.add_argument("--input", default=None, help="Nombre/parcial del micrófono de entrada (WASAPI)")
     p.add_argument("--output", default="CABLE Input", help="Nombre/parcial del dispositivo de salida (VB-Cable)")
     p.add_argument("--exclusive", action="store_true", help="WASAPI exclusive mode (menor latencia)")
-    p.add_argument("--whisper", default="small", help="Tamaño modelo faster-whisper (small/medium/large-v3, etc.)")
-    p.add_argument("--piper-model", default=str(Path(__file__).resolve().parents[1] / "models/piper/en_US-lessac-medium.onnx"),
-                   help="Ruta al modelo Piper .onnx")
+    p.add_argument("--profile", default="auto",
+                   choices=["auto", "cpu-light", "gpu-medium", "gpu-high"],
+                   help="Perfil de hardware/modelos")
     return p
 
 
