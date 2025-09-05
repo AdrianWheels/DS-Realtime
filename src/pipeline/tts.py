@@ -1,5 +1,8 @@
 from typing import Iterable
+
+import numpy as np
 from piper.voice import PiperVoice
+from TTS.api import TTS as CoquiTTS
 
 
 class PiperTTS:
@@ -13,3 +16,14 @@ class PiperTTS:
         for chunk in self.voice.synthesize_stream_raw(text):
             if chunk:
                 yield chunk
+
+
+class XTTSTTS:
+    def __init__(self, model_name: str = "tts_models/en/ljspeech/xtts_v2"):
+        self.tts = CoquiTTS(model_name)
+        self.sample_rate = self.tts.synthesizer.output_sample_rate
+
+    def synthesize_stream_raw(self, text: str) -> Iterable[bytes]:
+        wav = self.tts.tts(text)
+        pcm = (np.array(wav) * 32767).astype(np.int16).tobytes()
+        yield pcm
