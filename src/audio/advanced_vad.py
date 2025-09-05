@@ -3,8 +3,9 @@ import collections
 import webrtcvad
 import numpy as np
 import time
-import configparser
 from pathlib import Path
+
+from ..utils.config_utils import load_config
 
 
 class AdvancedVADSegmenter:
@@ -15,33 +16,10 @@ class AdvancedVADSegmenter:
         self.sample_rate = sample_rate
         self.frame_ms = frame_ms
         self.bytes_per_frame = int(sample_rate * frame_ms / 1000) * 2
+        self.config_file = config_file  # Guardar referencia al archivo
         
         # Cargar configuración
-        self.config = configparser.ConfigParser()
-        config_path = Path(config_file)
-        if config_path.exists():
-            self.config.read(config_path)
-        else:
-            # Valores por defecto
-            self.config.read_dict({
-                'vad': {
-                    'aggressiveness': '3',
-                    'padding_ms': '600',
-                    'voice_ratio_threshold': '0.8'
-                },
-                'audio': {
-                    'min_speech_duration_ms': '300',
-                    'max_silence_duration_ms': '800',
-                    'voice_threshold_db': '-30',
-                    'noise_gate_db': '-45'
-                },
-                'feedback_prevention': {
-                    'enable_feedback_detection': 'true',
-                    'max_consecutive_translations': '3',
-                    'cooldown_after_translation_ms': '500',
-                    'similarity_threshold': '0.8'
-                }
-            })
+        self.config = load_config(config_file)
         
         # Configuración VAD
         aggressiveness = int(self.config.get('vad', 'aggressiveness', fallback=3))
@@ -74,28 +52,43 @@ class AdvancedVADSegmenter:
         """Recarga la configuración desde el archivo config.ini en tiempo real."""
         try:
             # Recargar el archivo de configuración
-            self.config.read(self.config_file)
+            self.config = load_config(self.config_file)
             
             # Actualizar parámetros de VAD
-            aggressiveness = int(self.config.get('vad', 'aggressiveness', fallback=3))
+            aggressiveness = self.config.getint('vad', 'aggressiveness', fallback=3)
             self.vad.set_mode(aggressiveness)
             
-            padding_ms = int(self.config.get('vad', 'padding_ms', fallback=600))
+            padding_ms = self.config.getint('vad', 'padding_ms', fallback=600)
             self.num_pad = max(1, padding_ms // self.frame_ms)
             
             # Actualizar configuración de audio
-            self.min_speech_duration_ms = int(self.config.get('audio', 'min_speech_duration_ms', fallback=300))
-            self.max_silence_duration_ms = int(self.config.get('audio', 'max_silence_duration_ms', fallback=800))
-            self.voice_threshold_db = float(self.config.get('audio', 'voice_threshold_db', fallback=-30))
-            self.noise_gate_db = float(self.config.get('audio', 'noise_gate_db', fallback=-45))
+            self.min_speech_duration_ms = self.config.getint('audio', 
+                                                           'min_speech_duration_ms', 
+                                                           fallback=300)
+            self.max_silence_duration_ms = self.config.getint('audio', 
+                                                            'max_silence_duration_ms', 
+                                                            fallback=800)
+            self.voice_threshold_db = self.config.getfloat('audio', 
+                                                         'voice_threshold_db', 
+                                                         fallback=-30)
+            self.noise_gate_db = self.config.getfloat('audio', 
+                                                    'noise_gate_db', 
+                                                    fallback=-45)
             
             # Actualizar prevención de bucles
-            self.enable_feedback_detection = self.config.getboolean('feedback_prevention', 'enable_feedback_detection', fallback=True)
-            self.max_consecutive = int(self.config.get('feedback_prevention', 'max_consecutive_translations', fallback=3))
-            self.cooldown_ms = int(self.config.get('feedback_prevention', 'cooldown_after_translation_ms', fallback=500))
+            self.enable_feedback_detection = self.config.getboolean(
+                'feedback_prevention', 'enable_feedback_detection', fallback=True)
+            self.max_consecutive = self.config.getint('feedback_prevention', 
+                                                    'max_consecutive_translations', 
+                                                    fallback=3)
+            self.cooldown_ms = self.config.getint('feedback_prevention', 
+                                                'cooldown_after_translation_ms', 
+                                                fallback=500)
             
-            print(f"[VAD] ✅ Configuración recargada: aggressiveness={aggressiveness}, padding={padding_ms}ms")
-            print(f"[VAD] ✅ Niveles actualizados: voz={self.voice_threshold_db}dB, ruido={self.noise_gate_db}dB")
+            print(f"[VAD] ✅ Configuración recargada: "
+                  f"aggressiveness={aggressiveness}, padding={padding_ms}ms")
+            print(f"[VAD] ✅ Niveles actualizados: "
+                  f"voz={self.voice_threshold_db}dB, ruido={self.noise_gate_db}dB")
             
         except Exception as e:
             print(f"[VAD] ❌ Error recargando configuración: {e}")

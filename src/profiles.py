@@ -1,9 +1,15 @@
 from dataclasses import dataclass
+from pathlib import Path
+import os
 
 import torch
 
 from .pipeline.asr import FasterWhisperASR
 from .pipeline.tts import PiperTTS
+from .utils.error_handling import DSRealtimeLogger, validate_file_paths
+
+
+logger = DSRealtimeLogger("Profiles")
 
 
 @dataclass
@@ -35,9 +41,21 @@ def detect_profile() -> str:
 
 def build_profile(name: str) -> Profile:
     if name == "gpu-high":
-        from .pipeline.tts import XTTSTTS
-        asr = FasterWhisperASR(model_size="medium", device="cuda", compute_type="float16")
-        tts = XTTSTTS()
+        try:
+            from .pipeline.tts import XTTSTTS
+            asr = FasterWhisperASR(model_size="medium", device="cuda", 
+                                   compute_type="float16")
+            tts = XTTSTTS()
+        except Exception as e:
+            print(f"[PROFILE] Error cargando perfil gpu-high: {e}")
+            print("[PROFILE] Fallback a gpu-medium")
+            # Fallback a gpu-medium si falla XTTS
+            asr = FasterWhisperASR(model_size="small", device="cuda", 
+                                   compute_type="float16")
+            from pathlib import Path
+            base_dir = Path(__file__).parent.parent.parent
+            piper_model = base_dir / "models" / "piper" / "en_US-lessac-medium.onnx"
+            tts = PiperTTS(model_path=str(piper_model), use_cuda=False)
     elif name == "gpu-medium":
         asr = FasterWhisperASR(model_size="small", device="cuda", compute_type="float16")
         tts = PiperTTS(model_path="models/piper/en_US-lessac-medium.onnx", use_cuda=False)
@@ -62,15 +80,26 @@ def build_profile(name: str) -> Profile:
         # to avoid heavy downloads at startup (Coqui TTS attempts to fetch models
         # automatically which can fail or block). Users can later enable Coqui
         # or add Piper models in `models/`.
-        piper_model = "models/piper/en_US-lessac-medium.onnx"
+        from pathlib import Path
+        import os
+        
+        # Usar rutas absolutas para evitar errores de ruta
+        base_dir = Path(__file__).parent.parent.parent
+        piper_model = base_dir / "models" / "piper" / "en_US-lessac-medium.onnx"
+        piper_config = base_dir / "models" / "piper" / \
+            "en_US-lessac-medium.onnx.json"
+        
         try:
-            import os
-            if os.path.exists(piper_model) and os.path.exists(piper_model + ".json"):
-                tts = PiperTTS(model_path=piper_model, use_cuda=False)
+            if piper_model.exists() and piper_config.exists():
+                tts = PiperTTS(model_path=str(piper_model), use_cuda=False)
             else:
+                print(f"[PROFILE] Archivos Piper no encontrados:")
+                print(f"  Model: {piper_model}")
+                print(f"  Config: {piper_config}")
                 from .pipeline.tts import NoopTTS
                 tts = NoopTTS()
-        except Exception:
+        except Exception as e:
+            print(f"[PROFILE] Error cargando Piper TTS: {e}")
             from .pipeline.tts import NoopTTS
             tts = NoopTTS()
     return Profile(name=name, asr=asr, tts=tts)

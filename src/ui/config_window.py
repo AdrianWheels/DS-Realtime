@@ -1,11 +1,14 @@
 import configparser
 from pathlib import Path
+
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
     QSlider, QSpinBox, QDoubleSpinBox, QCheckBox, QPushButton,
     QTabWidget, QWidget, QGridLayout, QTextEdit, QScrollArea
 )
 from PySide6.QtCore import Qt, QTimer, Signal
+
+from ..utils.config_utils import load_config, save_config_value
 
 
 class ConfigWindow(QDialog):
@@ -32,11 +35,7 @@ class ConfigWindow(QDialog):
         
     def load_config(self):
         """Cargar configuración desde archivo"""
-        if self.config_path.exists():
-            self.config.read(self.config_path)
-        else:
-            # Valores por defecto si no existe el archivo
-            self.create_default_config()
+        self.config = load_config(self.config_path)
     
     def create_default_config(self):
         """Crear configuración por defecto"""

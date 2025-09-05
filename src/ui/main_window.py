@@ -14,8 +14,11 @@ from datetime import datetime
 from qasync import asyncSlot
 import sounddevice as sd
 import torch
+import os
 
 from .config_window import ConfigWindow
+from .audio_test_window import AudioTestWindow
+from ..utils.config_utils import CommentedConfigParser
 
 
 class MainWindow(QMainWindow):
@@ -113,6 +116,12 @@ class MainWindow(QMainWindow):
         self.btn_config.setFixedWidth(100)
         self.btn_config.clicked.connect(self.open_config_window)
         
+        # Botón de prueba de audio
+        self.btn_audio_test = QPushButton('🎤 Audio')
+        self.btn_audio_test.setFixedHeight(36)
+        self.btn_audio_test.setFixedWidth(100)
+        self.btn_audio_test.clicked.connect(self.open_audio_test_window)
+        
         # center buttons horizontally
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -121,6 +130,8 @@ class MainWindow(QMainWindow):
         btn_row.addWidget(self.btn_stop)
         btn_row.addSpacing(8)
         btn_row.addWidget(self.btn_config)
+        btn_row.addSpacing(8)
+        btn_row.addWidget(self.btn_audio_test)
         btn_row.addStretch()
         left.addLayout(btn_row)
 
@@ -188,43 +199,80 @@ class MainWindow(QMainWindow):
     def _populate_inputs(self):
         self.combo_in.clear()
         self.combo_out.clear()
+        
+        # Cargar dispositivos por defecto desde config.ini
+        config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config.ini')
+        config = CommentedConfigParser()
+        default_input_device = None
+        default_output_device = None
+        
+        try:
+            config.read(config_path)
+            if config.has_section('devices'):
+                default_input_device = config.getint('devices', 'default_input_device', fallback=None)
+                default_output_device = config.getint('devices', 'default_output_device', fallback=None)
+                self._debug(f'Config defaults: input={default_input_device}, output={default_output_device}')
+        except Exception as e:
+            self._debug(f'Failed to load config defaults: {e}')
+        
         try:
             devs = sd.query_devices()
+            input_devices = []
+            output_devices = []
+            
             for idx, d in enumerate(devs):
-                name = d.get("name", "")
-                max_in = int(d.get("max_input_channels", 0) or 0)
-                max_out = int(d.get("max_output_channels", 0) or 0)
-                self._debug(f"populate: device[{idx}] name={name!r} in={max_in} out={max_out}")
+                name = d.get('name', '')
+                max_in = int(d.get('max_input_channels', 0) or 0)
+                max_out = int(d.get('max_output_channels', 0) or 0)
+                self._debug(f'populate: device[{idx}] name={name!r} in={max_in} out={max_out}')
+                
                 if max_in:
+                    input_devices.append((idx, name))
                     self.combo_in.addItem(name)
                 if max_out:
+                    output_devices.append((idx, name))
                     self.combo_out.addItem(name)
         except Exception as e:
-            self._debug(f"_populate_inputs failed: {e}")
+            self._debug(f'_populate_inputs failed: {e}')
+            return
         
-        # Configurar dispositivos por defecto para Discord
+        # Auto-seleccionar dispositivos usando los valores de config.ini
         try:
-            # Buscar dispositivo de entrada: Logitech G535 (NO CABLE Output)
-            for i in range(self.combo_in.count()):
-                item_text = self.combo_in.itemText(i)
-                if ('Logitech G535' in item_text and 
-                    'micrófono' in item_text.lower()):
-                    self.combo_in.setCurrentIndex(i)
-                    self._debug(f'Auto-selected input: {item_text}')
-                    break
+            # Seleccionar dispositivo de entrada
+            if default_input_device is not None:
+                for i, (device_idx, device_name) in enumerate(input_devices):
+                    if device_idx == default_input_device:
+                        self.combo_in.setCurrentIndex(i)
+                        self._debug(f'Auto-selected input from config: {device_name} (device {device_idx})')
+                        break
+            else:
+                # Fallback: buscar Logitech G535
+                for i in range(self.combo_in.count()):
+                    item_text = self.combo_in.itemText(i)
+                    if ('Logitech G535' in item_text and 
+                        'micrófono' in item_text.lower()):
+                        self.combo_in.setCurrentIndex(i)
+                        self._debug(f'Fallback auto-selected input: {item_text}')
+                        break
             
-            # Buscar dispositivo de salida: CABLE Input - device 6
-            for i in range(self.combo_out.count()):
-                item_text = self.combo_out.itemText(i)
-                if item_text == 'CABLE Input (VB-Audio Virtual C':
-                    self.combo_out.setCurrentIndex(i)
-                    self._debug(f'Auto-selected output: {item_text}')
-                    break
-                # Fallback: CABLE In 16ch como alternativa
-                elif 'CABLE In 16ch (VB-Audio Virtual' in item_text:
-                    self.combo_out.setCurrentIndex(i)
-                    self._debug(f'Fallback output selected: {item_text}')
-                    # No break, seguir buscando el principal
+            # Seleccionar dispositivo de salida  
+            if default_output_device is not None:
+                for i, (device_idx, device_name) in enumerate(output_devices):
+                    if device_idx == default_output_device:
+                        self.combo_out.setCurrentIndex(i)
+                        self._debug(f'Auto-selected output from config: {device_name} (device {device_idx})')
+                        break
+            else:
+                # Fallback: buscar CABLE Input
+                for i in range(self.combo_out.count()):
+                    item_text = self.combo_out.itemText(i)
+                    if item_text == 'CABLE Input (VB-Audio Virtual C':
+                        self.combo_out.setCurrentIndex(i)
+                        self._debug(f'Fallback auto-selected output: {item_text}')
+                        break
+                    elif 'CABLE In 16ch (VB-Audio Virtual' in item_text:
+                        self.combo_out.setCurrentIndex(i)
+                        self._debug(f'Fallback output selected: {item_text}')
         except Exception as e:
             self._debug(f'auto-selection failed: {e}')
         
@@ -232,7 +280,9 @@ class MainWindow(QMainWindow):
         try:
             in_count = self.combo_in.count()
             out_count = self.combo_out.count()
-            self._debug(f"combo_in items={in_count} combo_out items={out_count}")
+            self._debug(f'combo_in items={in_count} combo_out items={out_count}')
+        except Exception:
+            pass
         except Exception:
             pass
         # connect selection change logging
@@ -388,6 +438,15 @@ class MainWindow(QMainWindow):
         self.config_window.show()
         self.config_window.raise_()
         self.config_window.activateWindow()
+
+    def open_audio_test_window(self):
+        """Abrir ventana de prueba de audio"""
+        if not hasattr(self, 'audio_test_window') or self.audio_test_window is None:
+            self.audio_test_window = AudioTestWindow(parent=self)
+        
+        self.audio_test_window.show()
+        self.audio_test_window.raise_()
+        self.audio_test_window.activateWindow()
 
     def on_config_changed(self, config_dict):
         """Manejar cambios de configuración en tiempo real"""
